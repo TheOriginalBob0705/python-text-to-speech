@@ -400,3 +400,65 @@ def parser2(data):
                             phoneme_index[pos] = 30
 
         pos += 1  # while
+
+
+def copy_stress(data):
+    """
+    Iterates through the phoneme buffer, copying the stress value from the following phoneme under the following
+    circumstances:
+        1. The current phoneme is voiced, excluding plosives and fricatives
+        2. The following phoneme is voiced, excluding plosives and fricatives, and
+        3. The following phoneme is stressed
+
+    In those cases, the stress value + 1 from the following phoneme is copied.
+
+    For example, the word LOITER is represented as LOY5TER with a stress of 5 on the dipthong OY. This routine will
+    copy the stress value of 6 (5 + 1) to the L that precedes it.
+
+    :param data: The data to populate
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    stress = data['stress']
+
+    pos = 0
+    Y = None
+
+    while (Y := phoneme_index[pos]) != END:
+        # if CONSONANT_FLAG set, skip - only vowels get stress
+        if (flags[Y] & 64) != 0:
+            Y = phoneme_index[pos + 1]
+            # if the following phoneme is the end or a vowel, skip
+            if (Y != END) and (flags[Y] & 128) != 0:
+                # get the stress value at the next position
+                Y = stress[pos + 1]
+                if Y and (Y & 128) == 0:
+                    # if the next phoneme is stressed and a VOWEL OR ER,
+                    # copy stress from the next phoneme to this one
+                    stress[pos] = Y + 1
+        pos += 1
+
+
+def set_phoneme_length(data):
+    """
+    Change phoneme_length dependent on stress
+
+    :param data: The data to populate
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+    stress = data['stress']
+
+    position = 0
+
+    while phoneme_index[position] != 255:
+        A = stress[position]
+        if A == 0 or (A & 128) != 0:
+            phoneme_length[position] = phoneme_length_table[phoneme_index[position]]
+        else:
+            phoneme_length[position] = phoneme_stressed_length_table[phoneme_index[position]]
+        position += 1
+
+
+
