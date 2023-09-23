@@ -60,7 +60,7 @@ def wild_match(sign1):
     return -1
 
 
-def parser1(input_data):
+def parser1(input_data, phoneme_index, stress):
     """
     Parse an input array of phonemes and stress markers.
 
@@ -107,20 +107,19 @@ def parser1(input_data):
     The character <0x9B> marks the end of text in input[]. When it is reached, the index 255 is placed at the end of
     the phoneme_index_table[], and the function returns with a 1 indicating success
 
-    :param input_data: The input array of phonemes and stress markers.
-                       Consists of phoneme_index[] and stress[], bothUint8Arrays
+
+    :param input_data: The input array of phonemes and stress markers
+    :param phoneme_index: Uint8Array
+    :param stress: Uint8Array
     :return: A dictionary containing 'phoneme_index' and 'stress' arrays, or None on failure
     """
-    phoneme_index = bytearray(256)
-    stress = bytearray(256)
-
     # Clear the stress table
     for i in range(256):
         stress[i] = 0
 
     position = 0
     src_pos = 0
-    while input_data[src_pos] != 0x9B:  # 0x9B marks the end of the buffer
+    while input_data[src_pos] != 155:  # 155 (\233) is the end-of-line marker
         sign1 = input_data[src_pos]
         src_pos += 1
         sign2 = input_data[src_pos]
@@ -144,13 +143,13 @@ def parser1(input_data):
                     match -= 1
 
                 if match == 0:
-                    return None  # Failure
+                    return 0  # Failure
 
                 stress[position - 1] = match  # Set stress for previous phoneme
 
     # End of parsing, mark end of phoneme_index table with 255
     phoneme_index[position] = 255
 
-    return {'phoneme_index': phoneme_index, 'stress': stress}
+    return 1
 
 
