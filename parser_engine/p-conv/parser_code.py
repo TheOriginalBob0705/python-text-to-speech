@@ -109,8 +109,8 @@ def parser1(input_data, data):
     The character <0x9B> marks the end of text in input[]. When it is reached, the index 255 is placed at the end of
     the phoneme_index_table[], and the function returns with a 1 indicating success
 
-
     :param input_data: The input array of phonemes and stress markers
+    :param data:
     :return: A dictionary containing 'phoneme_index' and 'stress' arrays, or None on failure
     """
     phoneme_index = data['phoneme_index']
@@ -487,8 +487,10 @@ def adjust_lengths(data):
     increased by (length * 1.5) + 1
     '''
     X = 0
-    while X < len(phoneme_index):
+    index = 0
+    while index != END:
         index = phoneme_index[X]
+        print(len(flags))
 
         # Check if the current phoneme is punctuation
         if (flags[index] & FLAG_PUNCT) != 0:
@@ -747,6 +749,10 @@ def parser(_input):
 
 
 def print_phonemes(data):
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+    stress = data['stress']
+
     def pad(num):
         return str(num).zfill(3)
 
@@ -759,8 +765,8 @@ def print_phonemes(data):
     while i < 255 and data['phoneme_index'][i] != 255:
         def name(phoneme):
             if data['phoneme_index'][i] < 81:
-                return chr(data['sign_input_table1'][data['phoneme_index'][i]]) + \
-                       chr(data['sign_input_table2'][data['phoneme_index'][i]])
+                return chr(sign_input_table1[phoneme_index[i]]) + \
+                       chr(sign_input_table2[phoneme_index[i]])
             elif phoneme == BREAK:
                 return '  '
             else:
@@ -769,10 +775,10 @@ def print_phonemes(data):
         print(
             ' {}  {}  {}       {}     {}'.format(
                 pad(i),
-                pad(data['phoneme_index'][i]),
-                name(data['phoneme_index'][i]),
-                pad(data['phoneme_length'][i]),
-                pad(data['stress'][i])
+                pad(phoneme_index[i]),
+                name(phoneme_index[i]),
+                pad(phoneme_length[i]),
+                pad(stress[i])
             )
         )
         i += 1
