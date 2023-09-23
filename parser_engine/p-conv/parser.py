@@ -461,4 +461,160 @@ def set_phoneme_length(data):
         position += 1
 
 
+def adjust_lengths(data):
+    """
+    Applies various rules that adjust the lengths of phonemes:
+        - Lengthen <FRICATIVE> or <VOICED> between <VOWEL> and <PUNCTUATION> by 1.5
+        - <VOWEL> <RX | LX> <CONSONANT> - decrease <VOWEL> length by 1
+        - <VOWEL> <UNVOICED PLOSIVE> - decrease vowel by 1/8th
+        - <VOWEL> <UNVOICED CONSONANT> - increase vowel by 1/2 + 1
+        - <NASAL> <STOP CONSONANT> - set nasal = 5, consonant = 6
+        - <VOICED STOP CONSONANT> {optional silence} <STOP CONSONANT> - shorten both to 1/2 + 1
+        - <LIQUID CONSONANT> <DIPTHONG> - decrease by 2
 
+    :param data: The data to populate
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+
+    '''
+    Lengthen vowels preceding punctuation
+    Search for punctuation. If found, back up to the first vowel, then process all phonemes between there and up to
+    (but not including) the punctuation. If any phoneme is found that is either a fricative or voiced, the duration is
+    increased by (length * 1.5) + 1
+    '''
+    X = 0
+    while X < len(phoneme_index):
+        index = phoneme_index[X]
+
+        # Check if the current phoneme is punctuation
+        if (flags[index] & FLAG_PUNCT) != 0:
+            loop_index = X
+            while X > 0 and (flags[phoneme_index[X]] & FLAG_VOWEL) == 0:
+                X -= 1
+            if X == 0:
+                break
+
+            while X != loop_index:
+                index = phoneme_index[X]
+
+                # Check for fricative or voiced
+                if (flags[index] & FLAG_FRICATIVE) == 0 or (flags[index] & FLAG_VOICED) != 0:
+                    # Lengthen the phoneme
+                    if DEVELOPMENT == 1:
+                        print(f"{X} PRE phoneme {chr(sign_input_table1[phoneme_index[X]])}"
+                              f"{chr(sign_input_table2[phoneme_index[X]])} length {phoneme_length[X]}")
+                        print(f"{X} Lengthen <FRICATIVE> or <VOICED> between <VOWEL> and <PUNCTUATION> by 1.5")
+                    A = phoneme_length[X]
+                    phoneme_length[X] = (A >> 1) + A + 1
+                    if DEVELOPMENT == 1:
+                        print(f"{X} POST phoneme {chr(sign_input_table1[phoneme_index[X]])}"
+                              f"{chr(sign_input_table2[phoneme_index[X]])} length {phoneme_length[X]}")
+                X += 1
+        X += 1
+
+    # Shorten vowels under specific circumstances
+    loop_index = 0
+    while loop_index < len(phoneme_index):
+        X = loop_index
+        index = phoneme_index[X]
+
+        if (flags[index] & FLAG_VOWEL) != 0:
+            index = phoneme_index[X + 1]
+
+            if (flags[index] & FLAG_CONSONANT) == 0:
+                if index == 18 or index == 19:  # 'RX', 'LX'
+                    index = phoneme_index[X + 2]
+                    if (flags[index] & FLAG_CONSONANT) != 0:
+                        if DEVELOPMENT == 1:
+                            print(f"{loop_index} PRE phoneme {chr(sign_input_table1[phoneme_index[loop_index]])}"
+                                  f"{chr(sign_input_table2[phoneme_index[loop_index]])} "
+                                  f"length {phoneme_length[loop_index]}")
+                            print(f"{loop_index} <VOWEL> <RX | LX> <CONSONANT> - decrease length of vowel by 1")
+
+                        phoneme_length[X] -= 1
+                        if DEVELOPMENT == 1:
+                            print(f"{loop_index} POST phoneme {chr(sign_input_table1[phoneme_index[loop_index]])}"
+                                  f"{chr(sign_input_table2[phoneme_index[loop_index]])} "
+                                  f"length {phoneme_length[loop_index]}")
+
+            else:  # Got here if not <VOWEL>
+                flag = 65 if index == END else flags[index]  # 65 if end marker
+
+                # Unvoiced
+                if (flag & FLAG_VOICED) == 0:
+                    # *, .*, ? *, , *, - *, DX, S *, SH, F *, TH, / H, / X, CH, P *, T *, K *, KX
+                    # unvoiced plosive
+                    if (flag & FLAG_UNVOICED_STOPCONS) != 0:
+                        # RULE: <VOWEL> <UNVOICED PLOSIVE>
+                        # <VOWEL> <P *, T *, K *, KX>
+                        if DEVELOPMENT == 1:
+                            print(f"{loop_index} PRE phoneme {chr(sign_input_table1[phoneme_index[loop_index]])}"
+                                  f"{chr(sign_input_table2[phoneme_index[loop_index]])} "
+                                  f"length {phoneme_length[loop_index]}")
+                            print(f"{loop_index} <VOWEL> <UNVOICED PLOSIVE> - decrease vowel by 1/8th")
+                        phoneme_length[X] -= phoneme_length[X] >> 3
+                        if DEVELOPMENT == 1:
+                            print(f"{loop_index} POST phoneme {chr(sign_input_table1[phoneme_index[loop_index]])}"
+                                  f"{chr(sign_input_table2[phoneme_index[loop_index]])} "
+                                  f"length {phoneme_length[loop_index]}")
+                else:
+                    if DEVELOPMENT == 1:
+                        print(f"{loop_index} PRE phoneme {chr(sign_input_table1[phoneme_index[loop_index]])}"
+                              f"{chr(sign_input_table2[phoneme_index[loop_index]])} "
+                              f"length {phoneme_length[loop_index]}")
+                        print(f"{index} <VOWEL> <VOICED CONSONANT> - increase vowel by 1/2 + 1")
+                    A = phoneme_length[X]
+                    phoneme_length[X] = (A >> 2) + A + 1
+                    if DEVELOPMENT == 1:
+                        print(f"{loop_index} POST phoneme {chr(sign_input_table1[phoneme_index[loop_index]])}"
+                              f"{chr(sign_input_table2[phoneme_index[loop_index]])} "
+                              f"length {phoneme_length[loop_index]}")
+
+        elif (flags[index] & FLAG_NASAL) != 0:
+            # RULE: <NASAL> <STOP CONSONANT>
+            # Set punctuation length to 6
+            # Set stop consonant length to 5
+            index = phoneme_index[X + 1]
+            if index != END and (flags[index] & FLAG_STOPCONS) != 0:
+                if DEVELOPMENT == 1:
+                    print(f"{X} RULE: <NASAL> <STOP CONSONANT> - set nasal = 5, consonant = 6")
+                phoneme_length[X + 1] = 6  # Set stop consonant length to 6
+                phoneme_length[X] = 5  # Set nasal length to 5
+
+        elif (flags[index] & FLAG_STOPCONS) != 0:  # (voiced) Stop consonant?
+            # RULE: <VOICED STOP CONSONANT> {optional silence} <STOP CONSONANT>
+            # Shorten both to (length / 2 + 1)
+            while phoneme_index[X + 1] == 0:
+                X += 1  # move past silence
+
+            index = phoneme_index[X + 1]
+            if index != END and (flags[index] & FLAG_STOPCONS) != 0:
+                # FIXME: this looks wrong?
+                # RULE: <UNVOICED STOP CONSONANT> {optional silence} <STOP CONSONANT>
+                if DEVELOPMENT == 1:
+                    print(f"{X} RULE: <UNVOICED STOP CONSONANT> {{optional silence}} "
+                          f"<STOP CONSONANT> - shorten both to 1/2 + 1")
+                phoneme_length[X] = (phoneme_length[X] >> 1) + 1
+                phoneme_length[X + 1] = (phoneme_length[X + 1] >> 1) + 1
+
+        elif (flags[index] & FLAG_LIQUIC) != 0:  # Liquic consonant?
+            # RULE: <VOICED NON-VOWEL> <DIPTHONG>
+            # Decrease <DIPTHONG> by 2
+            index = phoneme_index[X - 1]  # Prior phoneme
+
+            # FIXME: The debug code here breaks the rule
+            # FIXME: changed with braces by CS, check if it is correct
+            # prior phoneme a stop consonant>
+            if (flags[index] & FLAG_STOPCONS) != 0:
+                if DEVELOPMENT == 1:
+                    print(f"{X} PRE phoneme {chr(sign_input_table1[phoneme_index[X]])}"
+                          f"{chr(sign_input_table2[phoneme_index[X]])} length {phoneme_length[X]}")
+                    print(f"{X} <LIQUID CONSONANT> <DIPTHONG> - decrease by 2")
+                phoneme_length[X] -= 2
+                if DEVELOPMENT == 1:
+                    print(f"{X} POST phoneme {chr(sign_input_table1[phoneme_index[X]])}"
+                          f"{chr(sign_input_table2[phoneme_index[X]])} length {phoneme_length[X]}")
+
+        loop_index += 1
