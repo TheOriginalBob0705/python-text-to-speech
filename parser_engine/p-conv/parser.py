@@ -153,3 +153,30 @@ def parser1(input_data, phoneme_index, stress):
     return 1
 
 
+def insert(data, position, index, length, stress_value):
+    """
+    Insert a phoneme at the given position.
+
+    :param data: The data to populate
+    :param position: The position in the phoneme arrays to insert the phoneme
+    :param index: The phoneme index to insert
+    :param length: The phoneme length to insert
+    :param stress_value: The stress value to insert
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+    stress = data['stress']
+
+    # Always keep last safe-guarding 255
+    for i in range(253, position - 1, -1):
+        phoneme_index[i + 1] = phoneme_index[i]
+        phoneme_length[i + 1] = phoneme_length[i]
+        stress[i + 1] = stress[i]
+
+    phoneme_index[position] = index
+    phoneme_length[position] = length
+    stress[position] = stress_value
+
+
+
