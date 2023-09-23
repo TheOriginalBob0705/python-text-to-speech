@@ -1,3 +1,5 @@
+import numpy as np
+
 from tables import (
     sign_input_table1,
     sign_input_table2,
@@ -618,3 +620,161 @@ def adjust_lengths(data):
                           f"{chr(sign_input_table2[phoneme_index[X]])} length {phoneme_length[X]}")
 
         loop_index += 1
+
+
+def code_41240(data):
+    """
+    :param data: The data to populate
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+    stress = data['stress']
+
+    pos = -1
+    index = 0
+
+    while index != END and pos < len(phoneme_index):
+        index = phoneme_index[pos]
+
+        if index != END and pos < len(phoneme_index):
+            if (flags[index] & FLAG_STOPCONS) == 0:
+                pos += 1
+                continue
+
+            if (flags[index] & FLAG_UNVOICED_STOPCONS) == 0:
+                insert(data, pos + 1, index + 1, phoneme_length_table[index + 1], stress[pos])
+                insert(data, pos + 2, index + 2, phoneme_length_table[index + 2], stress[pos])
+                pos += 2
+                continue
+
+            X = pos
+            A = 0
+            while A == 0 and len(phoneme_index):
+                A = phoneme_index[X]
+                X += 1
+
+            if A != 255:
+                if (flags[A] & FLAG_0008) != 0:
+                    continue
+                if A == 36 or A == 37:
+                    continue  # '/H' '/X'
+
+            insert(data, pos + 1, index + 1, phoneme_length_table[index + 1], stress[pos])
+            insert(data, pos + 2, index + 2, phoneme_length_table[index + 2], stress[pos])
+            pos += 2
+
+
+def insert_breath(data):
+    """
+    :param data: The data to populate
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+    stress = data['stress']
+
+    pausePos = 255
+    len_val = 0  # mem55
+    phoneme = 0  # variable Y
+    pos = 0  # mem66
+
+    while phoneme != END and pos < len(phoneme_index):
+        # pos48440
+        phoneme = phoneme_index[pos]
+        len_val += phoneme_length[pos]
+
+        if len_val < 232:
+            if phoneme != 254:
+                if (flags[phoneme] & FLAG_PUNCT) != 0:
+                    len_val = 0
+                    insert(data, pos + 1, BREAK, 0, 0)
+                    pos += 2
+                    continue
+            if phoneme == 0:
+                pausePos = pos
+            pos += 1
+            continue
+
+        phoneme_index[pausePos] = 31
+        phoneme_length[pausePos] = 4
+        stress[pausePos] = 0
+        len_val = 0
+        insert(data, pausePos + 1, BREAK, 0, 0)
+        pos = pausePos + 2
+
+
+def parser(_input):
+    """
+    Parses speech data
+
+    :param _input:
+    :return: The parsed data
+    """
+    input_data = text_to_uint8_array(_input + chr(0x9b))
+
+    result = {
+        'stress': np.zeros(256, dtype=np.uint8),
+        'phoneme_length': np.zeros(256, dtype=np.uint8),
+        'phoneme_index': np.zeros(256, dtype=np.uint8)
+    }
+
+    result['phoneme_index'][255] = 32  # to prevent buffer overflow
+
+    if not parser1(input_data, result):
+        return False
+
+    if DEVELOPMENT == 1:
+        print_phonemes(result)
+
+    parser2(result)
+    copy_stress(result)
+    set_phoneme_length(result)
+    adjust_lengths(result)
+    code_41240(result)
+
+    for i in range(len(result['phoneme_index'])):
+        if result['phoneme_index'][i] > 80:
+            result['phoneme_index'][i] = END
+            break
+
+    insert_breath(result)
+
+    if DEVELOPMENT == 1:
+        print_phonemes(result)
+
+    return result
+
+
+def print_phonemes(data):
+    def pad(num):
+        return str(num).zfill(3)
+
+    i = 0
+    print('==================================')
+    print('Internal Phoneme presentation:')
+    print(' pos  idx  phoneme  length  stress')
+    print('----------------------------------')
+
+    while i < 255 and data['phoneme_index'][i] != 255:
+        def name(phoneme):
+            if data['phoneme_index'][i] < 81:
+                return chr(data['sign_input_table1'][data['phoneme_index'][i]]) + \
+                       chr(data['sign_input_table2'][data['phoneme_index'][i]])
+            elif phoneme == BREAK:
+                return '  '
+            else:
+                return '??'
+
+        print(
+            ' {}  {}  {}       {}     {}'.format(
+                pad(i),
+                pad(data['phoneme_index'][i]),
+                name(data['phoneme_index'][i]),
+                pad(data['phoneme_length'][i]),
+                pad(data['stress'][i])
+            )
+        )
+        i += 1
+
+    print('==================================')
