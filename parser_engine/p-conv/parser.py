@@ -29,7 +29,7 @@ from parser_engine.constants import (
     FLAG_UNVOICED_STOPCONS,
 )
 
-from common.constants import (BREAK, END)
+from common.constants import (BREAK, END, DEVELOPMENT)
 
 from util.util import text_to_uint8_array
 
@@ -60,7 +60,7 @@ def wild_match(sign1):
     return -1
 
 
-def parser1(input_data, phoneme_index, stress):
+def parser1(input_data, data):
     """
     Parse an input array of phonemes and stress markers.
 
@@ -109,10 +109,11 @@ def parser1(input_data, phoneme_index, stress):
 
 
     :param input_data: The input array of phonemes and stress markers
-    :param phoneme_index: Uint8Array
-    :param stress: Uint8Array
     :return: A dictionary containing 'phoneme_index' and 'stress' arrays, or None on failure
     """
+    phoneme_index = data['phoneme_index']
+    stress = data['stress']
+
     # Clear the stress table
     for i in range(256):
         stress[i] = 0
@@ -179,4 +180,223 @@ def insert(data, position, index, length, stress_value):
     stress[position] = stress_value
 
 
+def parser2(data):
+    """
+    Rewrites the phonemes using the following rules:
+        <DIPTHONG ENDING WITH WX> -> <DIPTHONG ENDING WITH WX> WX
+        <DIPTHONG NOT ENDING WITH WX> -> <DIPTHONG NOT ENDING WITH WX> YX
+        UL -> AX L
+        UM -> AX M
+        <STRESSED VOWEL> <SILENCE> <STRESSED VOWEL> -> <STRESSED VOWEL> <SILENCE> Q <VOWEL>
+        T R -> CH R
+        D R -> J R
+        <VOWEL> R -> <VOWEL> RX
+        <VOWEL> L -> <VOWEL> LX
+        G S -> G Z
+        K <VOWEL OR DIPTHONG NOT ENDING WITH IY> -> KX <VOWEL OR DIPTHONG NOT ENDING WITH IY>
+        G <VOWEL OR DIPTHONG NOT ENDING WITH IY> -> GX <VOWEL OR DIPTHONG NOT ENDING WITH IY>
+        S P -> S B
+        S T -> S D
+        S K -> S G
+        S KX -> S GX
+        CH -> CH CH' (CH requires two phonemes to represent it)
+        J -> J J' (J requires two phonemes to represent it)
+        <UNSTRESSED VOWEL> T <PAUSE> -> <UNSTRESSED VOWEL> DX <PAUSE>
+        <UNSTRESSED VOWEL> D <PAUSE> -> <UNSTRESSED VOWEL> DX <PAUSE>
 
+    :param
+    :return: None
+    """
+    phoneme_index = data['phoneme_index']
+    phoneme_length = data['phoneme_length']
+    stress = data['stress']
+
+    def rule_alveolar_uw(X):
+        # Alveolar flag set?
+        if (flags[phoneme_index[X - 1]] & FLAG_ALVEOLAR) != 0:
+            if DEVELOPMENT == 1:
+                print(f"{X} RULE: <ALVEOLAR> UW -> <ALVEOLAR> UX")
+            phoneme_index[X] = 16
+
+    def rule_ch(X):
+        if DEVELOPMENT == 1:
+            print(f"{X} RULE: CH -> CH CH+1")
+        insert(phoneme_index, X + 1, 43, 0, stress[X])
+
+    def rule_j(X):
+        if DEVELOPMENT == 1:
+            print(f"{X} RULE: J -> J J+1")
+        insert(phoneme_index, X + 1, 45, 0, stress[X])
+
+    def rule_g(pos):
+        # G <VOWEL ORR DIPTHONG NOT ENDING WITH IY -> GX <VOWEL OR DIPTHONG NOT ENDING WITH IY>
+        # Example: GO
+
+        index = phoneme_index[pos + 1]
+
+        # If dipthong ending with YX, continue processing next phoneme
+        if (index != 255) and ((flags[index] & FLAG_DIP_YX) == 0):
+            if DEVELOPMENT == 1:
+                print(f"{pos} RULE: G <VOWEL OR DIPTHONG NOT ENDING WITH IY> "
+                      f"-> GX <VOWEL OR DIPTHONG NOT ENDING WITH IY>")
+            # Replace G with GX and continue processing next phoneme
+            phoneme_index[pos] = 63  # 'GX'
+
+    def rule_dipthong(p, pf, pos):
+        # <DIPTHONG ENDING WITH WX> -> <DIPTHONG ENDING WITH WX> WX
+        # <DIPTHONG NOT ENDING WITH WX> -> <DIPTHONG NOT ENDING WITH WX> YX
+        # Example: OIL, COW
+
+        # If ends with IY, use YX, else use WX
+        A = 21 if (pf & FLAG_DIP_YX) != 0 else 20  # 'WX' = 20 'YX' = 21
+
+        # Insert at WX or YX following, copying the stress
+        if A == 20 and DEVELOPMENT == 1:
+            print(f"{pos} insert WX following dipthong NOT ending in IY sound")
+        if A == 21 and DEVELOPMENT == 1:
+            print(f"{pos} insert YX following dipthong ending in IY sound")
+        insert(phoneme_index, (pos + 1) & 0xFF, A, 0, stress[pos])
+
+        if p in (53, 42, 44):
+            if p == 53:
+                # Example: NEW, DEW, SUE, ZOO, THOO, TOO
+                rule_alveolar_uw(pos)
+            elif p == 42:
+                # Example: CHEW
+                rule_ch(pos)  # TODO: figure out why original code has rule_ch(pos, 0) (might just be a C thing)
+            elif p == 44:
+                # Example: JAY
+                rule_j(pos)
+
+    def change_rule(position, rule, mem60, stress_value):
+        if DEVELOPMENT == 1:
+            print(
+                f"{position} RULE: {chr(sign_input_table1[phoneme_index[position]])}{chr(sign_input_table2[phoneme_index[position]])} -> AX {chr(sign_input_table1[mem60])}{chr(sign_input_table2[mem60])}")
+        position = position & 0xFF
+        phoneme_index[position] = rule
+        insert(phoneme_index, position + 1, mem60, 0, stress_value)
+
+    pos = 0
+    p = None
+
+    while (p := phoneme_index[pos]) != END:
+        if DEVELOPMENT == 1:
+            print(f"{pos}: {chr(sign_input_table1[p])}{chr(sign_input_table2[p])}")
+
+        if p == 0:  # Is phoneme pause?
+            pos += 1
+            continue
+
+        pf = flags[p]
+        prior = phoneme_index[pos - 1]
+
+        if (pf & FLAG_DIPTHONG) != 0:
+            rule_dipthong(p, pf, pos, 0)
+        elif p == 78:
+            # Example: MEDDLE
+            if DEVELOPMENT == 1:
+                print(f"{pos} RULE: UL -> AX L")
+            change_rule(pos, 13, 24, stress[pos])
+        elif p == 79:
+            # Example: ASTRONOMY
+            if DEVELOPMENT == 1:
+                print(f"{pos} RULE: UM -> AX M")
+            change_rule(pos, 13, 27, stress[pos])
+        elif p == 80:
+            if DEVELOPMENT == 1:
+                print(f"{pos} RULE: UN -> AX N")
+            change_rule(pos, 13, 28, stress[pos])
+        elif (pf & FLAG_VOWEL) and stress[pos]:
+            # RULE:
+            # <STRESSED_VOWEL> <SILENCE> <STRESSED_VOWEL> -> <STRESSED VOWEL> <SILENCE> Q <VOWEL>
+            # EXAMPLE:: AWAY EIGHT
+            if not phoneme_index[pos + 1]:  # If following phoneme is a pause, get next
+                p = phoneme_index[pos + 2]
+                if p != END and (flags[p] & FLAG_VOWEL) != 0 and stress[pos + 2]:
+                    if DEVELOPMENT == 1:
+                        print(f"{pos + 2} Insert glottal stop between two stressed vowels with space between them")
+                    insert(phoneme_index, pos + 2, 31, 0, 0)  # 31 = 'Q'
+        elif p == pR:  # RULES FOR PHONEMES BEFORE R
+            if prior == pT:
+                # Example: TRACK
+                if DEVELOPMENT == 1:
+                    print(f"{pos} RULE: T* R* -> CH R*")
+                phoneme_index[pos - 1] = 42
+            elif prior == pD:
+                # Example: DRY
+                if DEVELOPMENT == 1:
+                    print(f"{pos} RULE: D* R* -> J* R*")
+                phoneme_index[pos - 1] = 44
+            elif (flags[prior] & FLAG_VOWEL) != 0:
+                # Example: ART
+                if DEVELOPMENT == 1:
+                    print(f"{pos} <VOWEL> R* -> <VOWEL> RX")
+                phoneme_index[pos] = 18
+        elif (p == 24) and ((flags[prior] & FLAG_VOWEL) != 0):
+            # Example: ALL
+            if DEVELOPMENT == 1:
+                print(f"{pos} <VOWEL> L* -> <VOWEL> LX")
+            phoneme_index[pos] = 19
+        elif prior == 60 and p == 32:  # 'G' 'S'
+            # Can't get to fire -
+            # 1. The G -> GX rule intervenes
+            # 2. Reciter already replaces GS -> GZ
+            if DEVELOPMENT == 1:
+                print(f"{pos} G S -> G Z")
+            phoneme_index[pos] = 38
+        elif p == 60:
+            rule_g(pos)
+        else:
+            if p == 72:  # 'K'
+                # K <VOWEL OR DIPTHONG NOT ENDING WITH IY> -> KX <VOWEL OR DIPTHONG NOT ENDING WITH IY>
+                # Example: COW
+                Y = phoneme_index[pos + 1]
+                # If, at the end, replace current phoneme with KX
+                if (flags[Y] & FLAG_DIP_YX) == 0 or Y == END:
+                    # VOWELS AND DIPTHONGS ENDING WITH IY SOUND flag set?
+                    if DEVELOPMENT == 1:
+                        print(f"{pos} K <VOWEL OR DIPTHONG NOT ENDING WITH IY> "
+                              f"-> KX <VOWEL OR DIPTHONG NOT ENDING WITH IY>")
+                    phoneme_index[pos] = 75
+                    p = 75
+                    pf = flags[p]
+
+                # Replace with softer version?
+                if (flags[p] & FLAG_UNVOICED_STOPCONS) and (prior == 32):  # 'S'
+                    # RULE:
+                    # S P -> S B
+                    # S T -> S D
+                    # S K -> S G
+                    # S KX -> S GX
+                    # Examples: SPY, STY, SKY, SCOWL
+                    if DEVELOPMENT == 1:
+                        print(f"{pos} S* {chr(sign_input_table1[p])}{chr(sign_input_table2[p])} "
+                              f"-> S* {chr(sign_input_table1[p - 12])}{chr(sign_input_table2[p - 12])}")
+                    phoneme_index[pos] = p - 12
+                elif (pf & FLAG_UNVOICED_STOPCONS) == 0:
+                    p = phoneme_index[pos]
+                    if p == 53:
+                        # Example: NEW, DEW, SUE, ZOO, THOO, TOO
+                        rule_alveolar_uw(pos)
+                    elif p == 42:
+                        rule_ch(pos)
+                    elif p == 44:
+                        # Example: JAY
+                        rule_j(pos)
+
+                if p in (69, 57): # 'T', 'D'
+                    # RULE: Soften T following vowel
+                    # NOTE: This rule fails for cases such as "ODD"
+                    # <UNSTRESSED VOWEL> T <PAUSE> -> <UNSTRESSED VOWEL> DX <PAUSE>
+                    # <UNSTRESSED VOWEL> D <PAUSE>  -> <UNSTRESSED VOWEL> DX <PAUSE>
+                    # Example: PARTY, TARDY
+                    if (flags[phoneme_index[pos - 1]] & FLAG_VOWEL) != 0:
+                        p = phoneme_index[pos + 1]
+                        if not p:
+                            p = phoneme_index[pos + 2]
+                        if (flags[p] & FLAG_VOWEL) and not stress[pos + 1]:
+                            if DEVELOPMENT == 1:
+                                print(f"{pos} Soften T or D following vowel or ER and preceding a pause -> DX")
+                            phoneme_index[pos] = 30
+
+        pos += 1  # while
