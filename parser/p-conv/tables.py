@@ -107,17 +107,17 @@ SPECIAL
 
 '''
 
-def encodeTable(table):
+
+def encode_table(table):
     result = bytearray(len(table))
     for index, e in enumerate(table):
         result[index] = ord(e)
     return result
 
 
-stress_input_table = encodeTable(['*', '1', '2', '3', '4', '5', '6', '7', '8'])
-print(stress_input_table)
+stress_input_table = encode_table(['*', '1', '2', '3', '4', '5', '6', '7', '8'])
 
-sign_input_table1 = encodeTable([
+sign_input_table1 = encode_table([
     ' ', '.', '?', ',', '-', 'I', 'I', 'E',
     'A', 'A', 'A', 'A', 'U', 'A', 'I', 'E',
     'U', 'O', 'R', 'L', 'W', 'Y', 'W', 'R',
@@ -131,7 +131,7 @@ sign_input_table1 = encodeTable([
     'U'
 ])
 
-sign_input_table2 = encodeTable([
+sign_input_table2 = encode_table([
     '*', '*', '*', '*', '*', 'Y', 'H', 'H',
     'E', 'A', 'H', 'O', 'H', 'X', 'X', 'R',
     'X', 'H', 'X', 'X', 'X', 'X', 'H', '*',
