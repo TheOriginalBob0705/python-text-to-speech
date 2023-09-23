@@ -1,3 +1,4 @@
 BREAK = 254
 END = 255
-DEVELOPMENT = 1
+
+DEV_MODE = True

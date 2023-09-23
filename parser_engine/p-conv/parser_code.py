@@ -1,6 +1,6 @@
 import numpy as np
 
-from tables import (
+from parser_engine.tables import (
     sign_input_table1,
     sign_input_table2,
     stress_input_table,
@@ -13,13 +13,10 @@ from parser_engine.constants import (
     pR,
     pD,
     pT,
-    FLAG_8000,
-    FLAG_4000,
     FLAG_FRICATIVE,
     FLAG_LIQUIC,
     FLAG_NASAL,
     FLAG_ALVEOLAR,
-    FLAG_0200,
     FLAG_PUNCT,
     FLAG_VOWEL,
     FLAG_CONSONANT,
