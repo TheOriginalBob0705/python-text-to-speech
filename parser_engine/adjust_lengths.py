@@ -1,4 +1,4 @@
-from tables import phoneme_name_table, phoneme_flags
+from parser_engine.tables import phoneme_name_table, phoneme_flags
 from common.constants import END
 from constants import (
     FLAG_PUNCT, FLAG_NASAL, FLAG_LIQUIC, FLAG_FRICATIVE,

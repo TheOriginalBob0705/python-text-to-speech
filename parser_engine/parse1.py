@@ -15,6 +15,12 @@ def full_match(sign1, sign2):
 
 
 def wild_match(sign1):
+    """
+    Match character with wildcard
+
+    :param sign1:
+    :return: Number
+    """
     index = next((i for i, value in enumerate(phoneme_name_table) if value == sign1 + '*'), -1)
     return index if index != -1 else False
 
@@ -96,5 +102,6 @@ def parser1(input_str, add_phoneme, add_stress):
             raise Exception()
 
         add_stress(match)  # Set the stress for the prior phoneme
+
         src_pos += 1
 
