@@ -1,5 +1,5 @@
 from common.constants import DEV_MODE
-from tables import phoneme_flags
+from parser_engine.tables import phoneme_flags
 from util.util import matches_bitmask
 
 

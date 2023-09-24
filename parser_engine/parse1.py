@@ -1,5 +1,5 @@
 from parser_engine.util import dev_print
-from tables import phoneme_name_table, stress_table
+from parser_engine.tables import phoneme_name_table, stress_table
 
 
 def full_match(sign1, sign2):
@@ -67,7 +67,7 @@ def parser1(input_str, add_phoneme, add_stress):
     src_pos = 0
     while src_pos < len(input_str):
         tmp = input_str.lower()
-        dev_print(f"processing \"{tmp[:src_pos]}%c{tmp[src_pos:src_pos+2].upper()}%c{tmp[src_pos+2:]}\"", 'color: red;', 'color:normal;')
+        dev_print(f"processing \"{tmp[:src_pos]}%c{tmp[src_pos:src_pos+2].upper()}%c{tmp[src_pos+2:]}\"")
 
         sign1 = input_str[src_pos]
         sign2 = input_str[src_pos + 1] if src_pos + 1 < len(input_str) else ''
