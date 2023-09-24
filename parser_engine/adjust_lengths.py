@@ -1,6 +1,6 @@
 from parser_engine.tables import phoneme_name_table, phoneme_flags
 from common.constants import END
-from constants import (
+from parser_engine.constants import (
     FLAG_PUNCT, FLAG_NASAL, FLAG_LIQUIC, FLAG_FRICATIVE,
     FLAG_UNVOICED_STOPCONS, FLAG_STOPCONS, FLAG_VOICED,
     FLAG_CONSONANT, FLAG_VOWEL

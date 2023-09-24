@@ -1,13 +1,13 @@
 from common.constants import BREAK, END, DEV_MODE
 from parser_engine.util import dev_print
-from tables import phoneme_name_table
-from parse1 import parser1
-from parse2 import parser2
-from adjust_lengths import adjust_lengths
-from copy_stress import copy_stress
-from set_phoneme_length import set_phoneme_length
-from insert_breath import insert_breath
-from prolong_plosive_stop_consonants import prolong_plosive_stop_consonants_code_41240
+from parser_engine.tables import phoneme_name_table
+from parser_engine.parse1 import parser1
+from parser_engine.parse2 import parser2
+from parser_engine.adjust_lengths import adjust_lengths
+from parser_engine.copy_stress import copy_stress
+from parser_engine.set_phoneme_length import set_phoneme_length
+from parser_engine.insert_breath import insert_breath
+from parser_engine.prolong_plosive_stop_consonants import prolong_plosive_stop_consonants_code_41240
 
 
 def parser(input_string):

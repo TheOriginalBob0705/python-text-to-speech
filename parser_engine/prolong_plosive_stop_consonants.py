@@ -1,6 +1,6 @@
 from common.constants import END
-from tables import combined_phoneme_length_table
-from constants import FLAG_0008, FLAG_STOPCONS, FLAG_UNVOICED_STOPCONS
+from parser_engine.tables import combined_phoneme_length_table
+from parser_engine.constants import FLAG_0008, FLAG_STOPCONS, FLAG_UNVOICED_STOPCONS
 from parser_engine.util import phoneme_has_flag
 
 

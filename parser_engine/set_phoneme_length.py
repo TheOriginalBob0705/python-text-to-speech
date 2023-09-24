@@ -1,4 +1,4 @@
-from tables import combined_phoneme_length_table
+from parser_engine.tables import combined_phoneme_length_table
 from common.constants import END
 
 

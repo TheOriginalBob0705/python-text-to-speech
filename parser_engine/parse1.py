@@ -1,5 +1,8 @@
 from parser_engine.util import dev_print
-from parser_engine.tables import phoneme_name_table, stress_table
+import parser_engine.tables as tb
+
+phoneme_name_table = tb.phoneme_name_table
+stress_table = tb.stress_table
 
 
 def full_match(sign1, sign2):
@@ -40,11 +43,10 @@ def parser1(input_str, add_phoneme, add_stress):
     The following process is used to parse the input buffer:
 
     Repeat until the end is reached:
-        1. First, a search is made for a 2 character match for phonemes that do not end with the '*' (wildcard)
-        character. On a match, the index of the phoneme is added to the result and the buffer position is advanced
-        2 bytes.
-        2. If this fails, a search is made for a 1 character match against all phoneme names ending with a '*'. If
-        this succeeds, the phoneme is added to result and the buffer position is advanced 1 byte.
+        1. First, search for a 2 character match for phonemes that do not end with the '*' (wildcard)
+        character. On a match, add the index of the phoneme to the result and advance the buffer position by 2 bytes.
+        2. If this fails, search for a 1 character match against all phoneme names ending with a '*'. If
+        this succeeds, add the phoneme to result and advance the buffer position by 1 byte.
         3.If this fails, search for a 1 character match in the stressInputTable[]. If this succeeds, the stress
         value is placed in the last stress[] table at the same index of the last added phoneme, and the buffer
         position is advanced by 1 byte.
@@ -81,7 +83,7 @@ def parser1(input_str, add_phoneme, add_stress):
 
         if match is not False:
             # Matched both characters (no wildcards)
-            src_pos += 1  # Skip the second character of the input as we have matched it already
+            src_pos += 2  # Skip the second character of the input as we have matched it already
             add_phoneme(match)
             continue
 
@@ -90,10 +92,11 @@ def parser1(input_str, add_phoneme, add_stress):
         if match is not False:
             # Matched the first character and the second is '*'
             add_phoneme(match)
+            src_pos += 1  # Skip the second character of the input as we have matched it already
             continue
 
         # Should be a stress character. Search through the stress table backwards
-        match = len(stress_table)
+        match = len(stress_table) - 1
         while sign1 != stress_table[match] and match > 0:
             match -= 1
 

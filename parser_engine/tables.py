@@ -84,9 +84,6 @@ phoneme_name_table = [
     'UN',  # 80
 ]
 
-# Match every two characters
-phoneme_name_table = [phoneme_name_table[i:i + 2] for i in range(0, len(phoneme_name_table), 2)]
-
 """
 Flags for phoneme names.
 
@@ -223,7 +220,7 @@ phoneme_flags = [
     0                                                                                  | 0x0040                   | 0x0008          | 0x0002 | 0x0001,  # '**' 77
     0                                                                         | 0x0080,                                                                 # 'UL' 78
     0                                                                         | 0x0080 | 0x0040                                              | 0x0001,  # 'UM' 79
-    0                                                                         | 0x0080 | 0x0040                                              | 0x0001  # 'UN' 80
+    0                                                                         | 0x0080 | 0x0040                                              | 0x0001   # 'UN' 80
 ]
 
 """

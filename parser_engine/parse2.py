@@ -1,7 +1,7 @@
 from common.constants import END
-from tables import phoneme_name_table
+from parser_engine.tables import phoneme_name_table
 from parser_engine.util import (phoneme_has_flag, dev_print)
-from constants import (
+from parser_engine.constants import (
     pR,
     pD,
     pT,
