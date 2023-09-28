@@ -75,7 +75,7 @@ def parser1(input_str, add_phoneme, add_stress):
     src_pos = 0
     while src_pos < len(input_str):
         tmp = input_str.lower()
-        dev_print(f"processing \"{tmp[:src_pos]}%c{tmp[src_pos:src_pos+2].upper()}%c{tmp[src_pos+2:]}\"")
+        dev_print(f"processing \"{tmp[:src_pos]}{{{tmp[src_pos:src_pos+2].upper()}}}{tmp[src_pos+2:]}\"")
 
         sign1 = input_str[src_pos]
         sign2 = input_str[src_pos + 1] if src_pos + 1 < len(input_str) else ''

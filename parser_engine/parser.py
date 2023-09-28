@@ -1,5 +1,5 @@
 from common.constants import BREAK, END, DEV_MODE
-from parser_engine.util import dev_print
+from parser_engine.util import dev_print, set_list
 from parser_engine.tables import phoneme_name_table
 from parser_engine.parse1 import parser1
 from parser_engine.parse2 import parser2
@@ -14,12 +14,6 @@ def parser(input_string):
     if not input_string:
         return False
 
-    stress = []  # numbers from  0 to 8
-    phoneme_length = []
-    phoneme_index = []
-
-    pos = 0
-
     def get_phoneme(pos):
         if DEV_MODE:
             if pos < 0 or pos >= len(phoneme_index):
@@ -30,25 +24,28 @@ def parser(input_string):
         dev_print(f"{pos} CHANGE: {phoneme_name_table[phoneme_index[pos]]} -> {phoneme_name_table[value]}")
         phoneme_index[pos] = value
 
-    def insert_phoneme(pos, value, stress_value, length = 0):
-        dev_print(f"{pos} INSERT: {phoneme_name_table[value]}")
+    def insert_phoneme(pos, value, stress_value, length=0):
+        if value == BREAK:
+            dev_print(f"{pos} INSERT: undefined")
+        else:
+            dev_print(f"{pos} INSERT: {phoneme_name_table[value]}")
         for i in range(len(phoneme_index) - 1, pos - 1, -1):
-            phoneme_index[i + 1] = phoneme_index[i]
-            phoneme_length[i + 1] = phoneme_length[i]
-            stress[i + 1] = get_stress(i)
-        phoneme_index[pos] = value
-        phoneme_length[pos] = length
-        stress[pos] = stress_value
+            set_list(phoneme_index, i + 1, phoneme_index[i])
+            set_list(phoneme_length, i + 1, get_length(i))
+            set_list(stress, i + 1, get_stress(i))
+        set_list(phoneme_index, pos, value)
+        set_list(phoneme_length, pos , length | 0)
+        set_list(stress, pos, stress_value)
 
     def get_stress(pos):
-        return stress[pos] if pos < len(stress) else 0
+        return stress[pos] if stress[pos] is not None else 0
 
     def set_stress(pos, stress_value):
         dev_print(f"{pos} \"{phoneme_name_table[phoneme_index[pos]]}\" SET STRESS: {stress[pos]} -> {stress_value}")
         stress[pos] = stress_value
 
     def get_length(pos):
-        return phoneme_length[pos] if pos < len(phoneme_length) else 0
+        return phoneme_length[pos] if phoneme_length[pos] is not None else 0
 
     def set_length(pos, length):
         dev_print(f"{pos} \"{phoneme_name_table[phoneme_index[pos]]}\" SET LENGTH: {phoneme_length[pos]} -> {length}")
@@ -60,23 +57,32 @@ def parser(input_string):
         phoneme_length[pos] = length
 
     def process_phoneme(value):
-        stress.append(0)
-        phoneme_length.append(0)
-        phoneme_index.append(value)
-        pos = len(phoneme_index) - 1  # Update pos to the index of the newly added phoneme
+        nonlocal pos
+        set_list(stress, pos, 0)
+        set_list(phoneme_length, pos, 0)
+        set_list(phoneme_index, pos, value)
+        pos += 1
 
     def process_stress(value):
+        nonlocal pos
         if DEV_MODE:
             if (value & 128) != 0:
                 raise ValueError('Got the flag 0x80, see CopyStress() and SetPhonemeLength() comments!')
-        stress[-1] = value  # Set stress for the prior phoneme
+        set_list(stress, pos - 1, value)  # Set stress for the prior phoneme
 
+    stress = []  # numbers from  0 to 8
+    phoneme_length = []
+    phoneme_index = []
+
+    pos = 0
     parser1(
-        input,
+        input_string,
         process_phoneme,
         process_stress
     )
-    phoneme_index.append(END)
+    set_list(phoneme_index, pos, END)
+    set_list(phoneme_length, pos, 0)
+    set_list(stress, pos, 0)
 
     if DEV_MODE:
         print_phonemes(phoneme_index, phoneme_length, stress)
@@ -92,7 +98,7 @@ def parser(input_string):
             phoneme_index[i] = END
             break  # error: delete all behind it
 
-    insert_breath(get_phoneme, set_phoneme, insert_phoneme, get_stress, get_length, set_length)
+    insert_breath(get_phoneme, set_phoneme, insert_phoneme, set_stress, get_length, set_length)
 
     if DEV_MODE:
         print_phonemes(phoneme_index, phoneme_length, stress)
@@ -113,7 +119,7 @@ def print_phonemes(phoneme_index, phoneme_length, stress):
         def name(phoneme):
             if phoneme_index[i] < 81:
                 return phoneme_name_table[phoneme_index[i]]
-            if phoneme == BREAK:
+            if phoneme == END:
                 return "  "
             return "??"
 

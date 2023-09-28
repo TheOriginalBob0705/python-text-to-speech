@@ -35,13 +35,21 @@ def adjust_lengths(get_phoneme, set_length, get_length):
     is increased by (length * 1.5) + 1
     '''
 
-    for position in range(len(get_phoneme)):
+    position = 0
+    while get_phoneme(position) != END:
         # Not punctuation?
         if not phoneme_has_flag(get_phoneme(position), FLAG_PUNCT):
+            position += 1
             continue
+
         loop_index = position
-        while position > 1 and not phoneme_has_flag(get_phoneme(position), FLAG_VOWEL):
+        while True:
             position -= 1
+            if position > 1 and (not phoneme_has_flag(get_phoneme(position), FLAG_VOWEL)):
+                continue
+            else:
+                break
+
         # If beginning of phonemes, exit loop
         if position == 0:
             break
@@ -49,10 +57,7 @@ def adjust_lengths(get_phoneme, set_length, get_length):
         # Now handle everything between position and loop_index
         for vowel in range(position, loop_index):
             # Test for not fricative/unvoiced or not voiced
-            if (
-                not phoneme_has_flag(get_phoneme(position), FLAG_FRICATIVE)
-                or phoneme_has_flag(get_phoneme(position), FLAG_VOICED)
-            ):
+            if not phoneme_has_flag(get_phoneme(position), FLAG_FRICATIVE) or phoneme_has_flag(get_phoneme(position), FLAG_VOICED):
                 A  = get_length(position)
                 # Change phoneme length to (length * 1.5) + 1
                 dev_print(f"{position} RULE: Lengthen <!FRICATIVE> or <VOICED> "
@@ -60,26 +65,35 @@ def adjust_lengths(get_phoneme, set_length, get_length):
                           f"{phoneme_name_table[get_phoneme(vowel)]} and PUNCTUATION:"
                           f"{phoneme_name_table[get_phoneme(position)]} by 1.5")
                 set_length(position, (A >> 1) + A + 1)
+            position += 1
+        position += 1
 
     # Similar to the above routine, but shorten vowels under some circumstances
     # Loop through all phonemes
     loop_index = -1
     while True:
-        phoneme = get_phoneme(loop_index + 1)
+        loop_index += 1
+        phoneme = get_phoneme(loop_index)
+
         position = loop_index
+
+        if phoneme == END:
+            break
 
         # Vowel?
         if phoneme_has_flag(phoneme, FLAG_VOWEL):
             # Get next phoneme
-            phoneme = get_phoneme(position + 1)
+            position += 1
+            phoneme = get_phoneme(position)
             # Not a consonant
             if not phoneme_has_flag(phoneme, FLAG_CONSONANT):
                 # 'RX' or 'LX'?
-                if (phoneme == 18 or phoneme == 19)  and phoneme_has_flag(get_phoneme(position + 2), FLAG_CONSONANT):
+                position += 1
+                if (phoneme == 18 or phoneme == 19) and phoneme_has_flag(get_phoneme(position), FLAG_CONSONANT):
                     # Followed by consonant?
                     dev_print(f"{loop_index} RULE: <VOWEL {phoneme_name_table[get_phoneme(loop_index)]}> "
                               f"{phoneme_name_table[phoneme]} "
-                              f"<CONSONANT: {phoneme_name_table[get_phoneme(position + 2)]}> "
+                              f"<CONSONANT: {phoneme_name_table[get_phoneme(position)]}> "
                               f"- decrease length of vowel by 1")
                     # Decrease length of vowel by 1 frame
                     set_length(loop_index, get_length(loop_index) - 1)
@@ -105,7 +119,7 @@ def adjust_lengths(get_phoneme, set_length, get_length):
             # Y *, M *, N *, NX, Q *, Z *, ZH, V *, DH, J *, EY, AY, OY, AW, OW, UW, B *, D *, G *, GX >
             dev_print(f"{loop_index} RULE: <VOWEL> <VOWEL or VOICED CONSONANT> - increase vowel by 1/4 + 1")
             A = get_length(loop_index)
-            set_length(loop_index, (A >> 2) + A + 1)
+            set_length(loop_index, (A >> 2) + A + 1)  # 5 / 4 * A + 1
             continue
 
         # *, .*, ?*, ,*, -*, WH, R*, L*, W*, Y*, M*, N*, NX, DX, Q*, S*, SH, F*,
@@ -118,13 +132,14 @@ def adjust_lengths(get_phoneme, set_length, get_length):
             # Set stop consonant length to 5
 
             #  M*, N*, NX
-            phoneme = get_phoneme(position + 1)
+            position += 1
+            phoneme = get_phoneme(position)
             # Is next phoneme a stop consonant?
             if phoneme != END and phoneme_has_flag(phoneme, FLAG_STOPCONS):
                 # B*, D*, G*, GX, P*, T*, K*, KX
                 dev_print(f"{position} RULE: <NASAL> <STOP CONSONANT> - set nasal = 5, consonant = 6")
-                set_length(position + 1, 6) # Set stop consonant length to 6
-                set_length(position, 5) # Set nasal length to 5
+                set_length(position, 6) # Set stop consonant length to 6
+                set_length(position - 1, 5) # Set nasal length to 5
             continue
 
         # *, .*, ? *, , *, - *, WH, R *, L *, W *, Y *, DX, Q *, S *, SH, F *, TH,
@@ -136,8 +151,11 @@ def adjust_lengths(get_phoneme, set_length, get_length):
 
             # RULE: <STOP CONSONANT> {optional silence} <STOP CONSONANT>
             # Shorten both to (length / 2 + 1)
-            while (phoneme := get_phoneme(position + 1)) == 0:
+            while True:
                 position += 1
+                phoneme = get_phoneme(position)
+                if phoneme != 0:
+                    break  # Exit the loop when phoneme is not equal to 0
             # If another stop consonant, process
             if phoneme != END and phoneme_has_flag(phoneme, FLAG_STOPCONS):
                 # RULE: <STOP CONSONANT> {optional silence} <STOP CONSONANT>
@@ -156,11 +174,10 @@ def adjust_lengths(get_phoneme, set_length, get_length):
             and phoneme_has_flag(phoneme, FLAG_LIQUIC)
             and phoneme_has_flag(get_phoneme(position - 1), FLAG_STOPCONS)
         ):
+            # R*, L*, W*, Y*
             # RULE: <STOP CONSONANT> <LIQUID>
-            # Decrease <LIQUID> by 2
+            #       Decrease <LIQUID> by 2
             # Prior phoneme is a stop consonant
             dev_print(f"{position} RULE: <STOP CONSONANT> <LIQUID> - decrease by 2")
-            set_length(position, get_length(position) - 2)
             # Decrease the phoneme length by 2 frames (20 ms)
-
-        loop_index += 1
+            set_length(position, get_length(position) - 2)

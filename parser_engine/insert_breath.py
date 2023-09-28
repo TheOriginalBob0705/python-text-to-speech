@@ -15,10 +15,14 @@ def insert_breath(get_phoneme, set_phoneme, insert_phoneme, set_stress, get_leng
     """
     mem54 = 255
     len_val = 0  # mem55
-    index = None  # variable Y
     pos = -1
 
-    while (index := get_phoneme(pos)) != END:
+    while True:
+        pos += 1
+        index = get_phoneme(pos)
+        if index == END:
+            break
+
         len_val += get_length(pos)
 
         if len_val < 232:
